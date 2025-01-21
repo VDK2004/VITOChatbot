@@ -7,6 +7,11 @@ import numpy as np
 from datetime import datetime, timedelta
 import time
 from groq import Groq
+import tensorflow as tf
+
+# Suppress TensorFlow warnings
+tf.compat.v1.disable_eager_execution()
+tf.compat.v1.reset_default_graph()
 
 # Pinecone-configuratie
 PINECONE_API_KEY = "pcsk_4v8YTF_6Sgtnwh2Tm38koMurffJJLUp4eyHncT843KmkeKN3GVbjqSNbFPtzjBiDTfkF6V"
@@ -26,7 +31,7 @@ index = pc.Index(INDEX_NAME)
 # Embedder configuratie
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
-# Initialiseer sessie-variabelen
+# Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "chat_embeddings" not in st.session_state:
@@ -37,8 +42,15 @@ if "request_count" not in st.session_state:
     st.session_state.request_count = 0
 if "user_input" not in st.session_state:
     st.session_state.user_input = ""
+if "message_counter" not in st.session_state:
+    st.session_state.message_counter = len(st.session_state.messages) * 2  # Initialize based on existing messages
 
-# Rate limiting functie blijft hetzelfde
+# Migrate existing messages to include keys if they don't have them
+for i, msg in enumerate(st.session_state.messages):
+    if "key" not in msg:
+        msg["key"] = f"msg_{i}"
+        st.session_state.message_counter = max(st.session_state.message_counter, i + 1)
+
 def check_rate_limit():
     current_time = datetime.now()
     if current_time - st.session_state.last_request_time > timedelta(minutes=1):
@@ -121,8 +133,18 @@ Geef een duidelijk en behulpzaam antwoord gebaseerd op de context.
             if not answer:
                 answer = "Ik kon geen relevante informatie vinden. Probeer opnieuw."
 
-            st.session_state.messages.append({"role": "user", "content": question})
-            st.session_state.messages.append({"role": "assistant", "content": answer})
+            # Add messages with unique keys
+            st.session_state.message_counter += 2
+            st.session_state.messages.append({
+                "role": "user",
+                "content": question,
+                "key": f"msg_{st.session_state.message_counter - 1}"
+            })
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": answer,
+                "key": f"msg_{st.session_state.message_counter}"
+            })
 
         except Exception as e:
             st.error(f"Er is een fout opgetreden: {e}")
@@ -133,21 +155,24 @@ def handle_input():
         st.session_state.user_input = ""  # Reset input
         ask_question(question)
 
-# Maak een container voor de chatgeschiedenis
+# Create chat container
 chat_container = st.container()
 
-# Toon chatgeschiedenis in de container
+# Display chat history with proper key handling
 with chat_container:
-    for msg in st.session_state.messages:
-        if msg["role"] == "user":
-            message(msg["content"], is_user=True)
-        elif msg["role"] == "assistant":
-            message(msg["content"], is_user=False)
+    for i, msg in enumerate(st.session_state.messages):
+        if "key" not in msg:
+            msg["key"] = f"legacy_msg_{i}"
+        message(
+            msg["content"],
+            is_user=(msg["role"] == "user"),
+            key=msg["key"]
+        )
 
-# Voeg wat ruimte toe tussen de chat en de invoer
+# Add spacing between chat and input
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Plaats de gebruikersinvoer onder de chatgeschiedenis met automatisch versturen
+# Place user input below chat history with automatic sending
 st.text_input(
     "Typ je vraag:",
     key="user_input",
