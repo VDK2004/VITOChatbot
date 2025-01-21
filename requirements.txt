@@ -1,0 +1,14 @@
+python-pptx
+streamlit
+pinecone-client
+sentence-transformers
+youtube-transcript-api
+PyPDF2
+selenium
+requests
+beautifulsoup4
+openai
+google-generativeai
+tensorflow
+tf-keras
+groq
