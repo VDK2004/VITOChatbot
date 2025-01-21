@@ -12,3 +12,4 @@ google-generativeai
 tensorflow
 tf-keras
 groq
+streamlit-chat
