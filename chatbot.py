@@ -152,8 +152,14 @@ Geef een duidelijk en behulpzaam antwoord gebaseerd op de context.
 def handle_input():
     if st.session_state.user_input and st.session_state.user_input.strip():
         question = st.session_state.user_input.strip()
+        
+        # Controleer of de vraag eindigt met een '?', zo niet, voeg het toe
+        if not question.endswith('?'):
+            question += '?'
+        
         st.session_state.user_input = ""  # Reset input
         ask_question(question)
+
 
 # Create chat container
 chat_container = st.container()
