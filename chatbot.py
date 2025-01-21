@@ -140,9 +140,7 @@ Geef een duidelijk en behulpzaam antwoord gebaseerd op de context.
         except Exception as e:
             st.error(f"Er is een fout opgetreden: {e}")
 
-# Chat interface
-st.title("Virtuele Assistent met Knowledge Base")
-st.write("Stel je vraag en krijg een antwoord uit de kennisbank.")
+
 # Gebruikersinvoer
 user_input = st.text_input("Typ je vraag:")
 if st.button("Verstuur") and user_input:
