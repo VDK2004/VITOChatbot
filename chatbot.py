@@ -1,3 +1,28 @@
+# Streamlit configuratie moet helemaal bovenaan staan
+import streamlit as st
+import streamlit.components.v1 as components
+
+# Configureer Streamlit voor cross-origin cookies
+st.set_page_config(
+    page_title="VITO Chatbot",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+# Configureer cookies voor cross-origin gebruik
+if not st.session_state.get("cookie_configured"):
+    components.html(
+        """
+        <script>
+            // Stel SameSite attribuut in op 'None' voor cross-origin gebruik
+            document.cookie = "SameSite=None; Secure";
+        </script>
+        """,
+        height=0
+    )
+    st.session_state.cookie_configured = True
+
 import streamlit as st
 from streamlit_chat import message
 from pinecone import Pinecone
@@ -43,7 +68,7 @@ if "request_count" not in st.session_state:
 if "user_input" not in st.session_state:
     st.session_state.user_input = ""
 if "message_counter" not in st.session_state:
-    st.session_state.message_counter = len(st.session_state.messages) * 2  # Initialize based on existing messages
+    st.session_state.message_counter = len(st.session_state.messages) * 2
 
 # Migrate existing messages to include keys if they don't have them
 for i, msg in enumerate(st.session_state.messages):
@@ -154,6 +179,15 @@ def handle_input():
         question = st.session_state.user_input.strip()
         st.session_state.user_input = ""  # Reset input
         ask_question(question)
+
+# Verwijder de standaard Streamlit menu en footer
+hide_streamlit_style = """
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+</style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # Create chat container
 chat_container = st.container()
