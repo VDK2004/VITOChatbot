@@ -169,8 +169,7 @@ with chat_container:
             key=msg["key"]
         )
 
-# Add spacing between chat and input
-st.markdown("<br>", unsafe_allow_html=True)
+
 
 # Place user input below chat history with automatic sending
 st.text_input(
