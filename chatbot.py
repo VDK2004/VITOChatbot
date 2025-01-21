@@ -1,5 +1,5 @@
 import streamlit as st
-from streamlit_chat import message  # Voor een interactieve chatstijl
+from streamlit_chat import message
 from pinecone import Pinecone
 from sentence_transformers import SentenceTransformer
 import google.generativeai as genai
@@ -26,7 +26,7 @@ index = pc.Index(INDEX_NAME)
 # Embedder configuratie
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
-# Initialiseer chatgeschiedenis en andere sessie-variabelen
+# Initialiseer sessie-variabelen
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "chat_embeddings" not in st.session_state:
@@ -35,10 +35,11 @@ if "last_request_time" not in st.session_state:
     st.session_state.last_request_time = datetime.min
 if "request_count" not in st.session_state:
     st.session_state.request_count = 0
+if "user_input" not in st.session_state:
+    st.session_state.user_input = ""
 
-# Rate limiting
+# Rate limiting functie blijft hetzelfde
 def check_rate_limit():
-    """Controleer of verzoeken binnen de toegestane limiet vallen."""
     current_time = datetime.now()
     if current_time - st.session_state.last_request_time > timedelta(minutes=1):
         st.session_state.request_count = 0
@@ -50,25 +51,19 @@ def check_rate_limit():
     st.session_state.last_request_time = current_time
     return True, 0
 
-# Limiteer tokens
 def limit_tokens(text, max_tokens=500):
-    """Beperk het aantal tokens (woorden) in tekst."""
     words = text.split()
     if len(words) > max_tokens:
         return ' '.join(words[:max_tokens]) + "... (antwoord ingekort)"
     return text
 
-# Limiteer context
 def limit_context(text, max_tokens=2000):
-    """Beperk context tot een maximum aantal tokens."""
     words = text.split()
     if len(words) > max_tokens:
         return ' '.join(words[:max_tokens]) + "..."
     return text
 
-# Genereer antwoord met Groq
 def generate_with_groq(prompt):
-    """Genereer antwoord met de Groq API."""
     try:
         limited_prompt = limit_context(prompt, max_tokens=4000)
         completion = groq_client.chat.completions.create(
@@ -88,9 +83,7 @@ def generate_with_groq(prompt):
         st.error(f"Fout bij Groq API: {e}")
         return "Er is een fout opgetreden met Groq. Probeer het later opnieuw."
 
-# Genereer antwoord met fallback naar Groq
 def generate_response(prompt):
-    """Probeer eerst Gemini, gebruik Groq als fallback."""
     try:
         response = genai.GenerativeModel('gemini-pro').generate_content(prompt)
         if response and response.text:
@@ -98,9 +91,7 @@ def generate_response(prompt):
     except Exception:
         return generate_with_groq(prompt)
 
-# Vraagverwerking
 def ask_question(question):
-    """Verwerk de vraag en genereer een antwoord."""
     with st.spinner("Bezig met het genereren van een antwoord..."):
         try:
             can_proceed, wait_time = check_rate_limit()
@@ -108,18 +99,15 @@ def ask_question(question):
                 st.warning(f"Wacht {wait_time} seconden voordat je een nieuwe vraag stelt.")
                 return
 
-            # Genereer embedding voor de vraag
             query_embedding = embedder.encode(question).tolist()
             st.session_state.chat_embeddings.append(query_embedding)
 
-            # Zoek in Pinecone
             results = index.query(vector=query_embedding, top_k=5, include_metadata=True)
             context = ""
             if results["matches"]:
                 for match in results["matches"]:
                     context += match["metadata"].get("text", "") + "\n"
 
-            # Bereid prompt voor
             limited_context = limit_context(context, max_tokens=2000)
             prompt = f"""
 Context:
@@ -133,22 +121,35 @@ Geef een duidelijk en behulpzaam antwoord gebaseerd op de context.
             if not answer:
                 answer = "Ik kon geen relevante informatie vinden. Probeer opnieuw."
 
-            # Update chatgeschiedenis
             st.session_state.messages.append({"role": "user", "content": question})
             st.session_state.messages.append({"role": "assistant", "content": answer})
 
         except Exception as e:
             st.error(f"Er is een fout opgetreden: {e}")
 
+def handle_input():
+    if st.session_state.user_input and st.session_state.user_input.strip():
+        question = st.session_state.user_input.strip()
+        st.session_state.user_input = ""  # Reset input
+        ask_question(question)
 
-# Gebruikersinvoer
-user_input = st.text_input("Typ je vraag:")
-if st.button("Verstuur") and user_input:
-    ask_question(user_input)
+# Maak een container voor de chatgeschiedenis
+chat_container = st.container()
 
-# Toon chatgeschiedenis
-for msg in st.session_state.messages:
-    if msg["role"] == "user":
-        message(msg["content"], is_user=True)
-    elif msg["role"] == "assistant":
-        message(msg["content"], is_user=False)
+# Toon chatgeschiedenis in de container
+with chat_container:
+    for msg in st.session_state.messages:
+        if msg["role"] == "user":
+            message(msg["content"], is_user=True)
+        elif msg["role"] == "assistant":
+            message(msg["content"], is_user=False)
+
+# Voeg wat ruimte toe tussen de chat en de invoer
+st.markdown("<br>", unsafe_allow_html=True)
+
+# Plaats de gebruikersinvoer onder de chatgeschiedenis met automatisch versturen
+st.text_input(
+    "Typ je vraag:",
+    key="user_input",
+    on_change=handle_input
+)
