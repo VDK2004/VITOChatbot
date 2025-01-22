@@ -13,13 +13,21 @@ import requests
 # Pinecone-configuratie
 PINECONE_API_KEY = "pcsk_4v8YTF_6Sgtnwh2Tm38koMurffJJLUp4eyHncT843KmkeKN3GVbjqSNbFPtzjBiDTfkF6V"
 INDEX_NAME = "projectvito"
-pc = Pinecone(api_key=PINECONE_API_KEY)
 
-# Verbind met de bestaande index
-index = pc.Index(INDEX_NAME)
+@st.cache_resource
+def initialize_pinecone(api_key, index_name):
+    pc = Pinecone(api_key=api_key)
+    return pc.Index(index_name)
+
+index = initialize_pinecone(PINECONE_API_KEY, INDEX_NAME)
+
 
 # Embedder configuratie
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
+@st.cache_resource
+def load_embedder():
+    return SentenceTransformer("all-MiniLM-L6-v2")
+embedder = load_embedder()
+
 
 # Functie om PowerPoint-bestanden te verwerken
 def extract_text_from_pptx(file):
@@ -60,9 +68,6 @@ def limit_text_size(text, max_bytes=40000):
             text_bytes = text.encode('utf-8')
     return text
 
-# Streamlit-app
-st.title("Pinecone Uploadpagina")
-st.write("Upload bestanden, video's, webpagina's en PowerPoints en voeg ze toe aan je Pinecone-index.")
 
 # Tabs voor upload-opties
 tab1, tab2, tab3, tab4 = st.tabs(["📄 Bestanden", "📹 YouTube-video's", "🌐 Webpagina's", "📊 PowerPoints"])
